@@ -6,15 +6,17 @@
     <style>
         body { font-family: 'Malgun Gothic', sans-serif; padding: 20px; }
         .drop-area { border: 2px dashed #ccc; padding: 20px; text-align: center; }
+        #loading { display: none; }
     </style>
 </head>
 <body>
     <h1>Excel to HTML</h1>
     <div class="drop-area" id="drop-area">
-        <p>Excel 파일을 여기에 드롭하세요</p>
+        <p>Excel 파일을 여기에 드롭하거나 클릭하세요</p>
         <input type="file" id="file-input" accept=".xlsx,.xls" style="display: none;">
         <button onclick="document.getElementById('file-input').click()">파일 선택</button>
     </div>
+    <div id="loading">처리 중...</div>
     <div id="preview" style="margin-top: 20px;"></div>
 
     <script src="https://cdn.jsdelivr.net/npm/exceljs@4.3.0/dist/exceljs.min.js"></script>
@@ -23,24 +25,43 @@
 
         const dropArea = document.getElementById('drop-area');
         const fileInput = document.getElementById('file-input');
+        const loading = document.getElementById('loading');
         const preview = document.getElementById('preview');
+
+        // 드래그 앤 드롭 이벤트
+        dropArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropArea.style.backgroundColor = '#e0e0e0';
+        });
+
+        dropArea.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            dropArea.style.backgroundColor = '';
+        });
 
         dropArea.addEventListener('drop', (e) => {
             e.preventDefault();
-            handleFiles(e.dataTransfer.files);
+            dropArea.style.backgroundColor = '';
+            const files = e.dataTransfer.files;
+            handleFiles(files);
         });
-        dropArea.addEventListener('dragover', (e) => e.preventDefault());
-        fileInput.addEventListener('change', () => handleFiles(fileInput.files));
+
+        fileInput.addEventListener('change', (e) => {
+            handleFiles(e.target.files);
+        });
 
         async function handleFiles(files) {
             if (files.length === 0) return;
             const file = files[0];
             if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
-                alert('Excel 파일만 가능합니다.');
+                alert('Excel 파일(.xlsx, .xls)만 가능합니다.');
                 return;
             }
 
             try {
+                loading.style.display = 'block';
+                preview.innerHTML = '';
+
                 const workbook = new ExcelJS.Workbook();
                 const arrayBuffer = await file.arrayBuffer();
                 await workbook.xlsx.load(arrayBuffer);
@@ -59,8 +80,10 @@
                 });
                 preview.innerHTML = html;
             } catch (error) {
-                console.error('오류:', error);
+                console.error('파일 처리 오류:', error);
                 alert('파일 처리 중 오류 발생: ' + error.message);
+            } finally {
+                loading.style.display = 'none';
             }
         }
 
