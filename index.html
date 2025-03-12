@@ -117,14 +117,11 @@
         <button class="btn btn-success" id="download-all-btn">모든 시트 HTML 다운로드</button>
     </div>
 
-    <!-- ExcelJS 라이브러리 로드 -->
     <script src="https://cdn.jsdelivr.net/npm/exceljs@4.3.0/dist/exceljs.min.js"></script>
     <script>
-        // 전역 변수
         let workbook = null;
         let generatedHtml = {};
 
-        // DOM 요소
         const dropArea = document.getElementById('drop-area');
         const fileInput = document.getElementById('file-input');
         const loading = document.getElementById('loading');
@@ -133,7 +130,6 @@
         const sheetContents = document.getElementById('sheet-contents');
         const downloadAllBtn = document.getElementById('download-all-btn');
 
-        // 드래그 앤 드롭 이벤트 핸들링
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
             dropArea.addEventListener(eventName, preventDefaults, false);
         });
@@ -241,7 +237,7 @@
             const columnWidths = {};
             sheet.columns.forEach((column, index) => {
                 if (column.width) {
-                    columnWidths[index + 1] = column.width * 8; // 엑셀 단위를 px로 근사 변환
+                    columnWidths[index + 1] = column.width * 8;
                 }
             });
             
@@ -472,11 +468,11 @@
         function escapeHtml(text) {
             if (typeof text !== 'string') return String(text);
             return text
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;')
-                .replace(/'/g, '&#39;');
+                .replace(/&/g, '&')
+                .replace(/</g, '<')
+                .replace(/>/g, '>')
+                .replace(/"/g, '"')
+                .replace(/'/g, ''');
         }
     </script>
 </body>
