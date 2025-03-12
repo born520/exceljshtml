@@ -689,18 +689,18 @@
             }, 0);
         }
 
-        // HTML 이스케이프 함수
-        function escapeHtml(text) {
-            if (typeof text !== 'string') {
-                return String(text);
-            }
-            return text
-                .replace(/&/g, "&amp;")
-                .replace(/</g, "&lt;")
-                .replace(/>/g, "&gt;")
-                .replace(/"/g, "&quot;")
-                .replace(/'/g, "&#039;");
-        }
+// HTML 이스케이프 함수
+function escapeHtml(text) {
+    if (typeof text !== 'string') {
+        return String(text);
+    }
+    return text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
     </script>
 </body>
 </html>
