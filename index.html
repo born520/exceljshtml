@@ -2,477 +2,76 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Excel to HTML 변환기</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <title>Excel to HTML 간소화</title>
     <style>
-        body {
-            font-family: 'Malgun Gothic', '맑은 고딕', sans-serif;
-            padding: 20px;
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-        .drop-area {
-            border: 2px dashed #ccc;
-            border-radius: 10px;
-            padding: 40px;
-            text-align: center;
-            margin: 20px 0;
-            background-color: #f8f9fa;
-            transition: all 0.3s ease;
-        }
-        .drop-area.active {
-            border-color: #0d6efd;
-            background-color: #e9f0ff;
-        }
-        .preview-container {
-            margin-top: 30px;
-            border: 1px solid #dee2e6;
-            border-radius: 5px;
-            padding: 20px;
-        }
-        .sheet-tabs {
-            display: flex;
-            margin-bottom: 15px;
-            overflow-x: auto;
-            border-bottom: 1px solid #dee2e6;
-            padding-bottom: 10px;
-        }
-        .sheet-tab {
-            padding: 8px 15px;
-            margin-right: 5px;
-            cursor: pointer;
-            border-radius: 5px 5px 0 0;
-            border: 1px solid #dee2e6;
-            border-bottom: none;
-            background-color: #f8f9fa;
-            transition: all 0.2s ease;
-        }
-        .sheet-tab.active {
-            background-color: #0d6efd;
-            color: white;
-            border-color: #0d6efd;
-        }
-        .sheet-content {
-            display: none;
-        }
-        .sheet-content.active {
-            display: block;
-        }
-        .loading {
-            display: none;
-            text-align: center;
-            margin: 20px 0;
-        }
-        .loader {
-            border: 5px solid #f3f3f3;
-            border-top: 5px solid #3498db;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 2s linear infinite;
-            margin: 0 auto 10px;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        #download-all-btn {
-            display: none;
-            margin-top: 20px;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 20px;
-        }
-        table, th, td {
-            border: 1px solid #ddd;
-        }
-        th, td {
-            padding: 8px;
-            text-align: left;
-        }
+        body { font-family: 'Malgun Gothic', sans-serif; padding: 20px; }
+        .drop-area { border: 2px dashed #ccc; padding: 20px; text-align: center; }
     </style>
 </head>
 <body>
-    <h1 class="mb-4">Excel to HTML 변환기</h1>
-    <p class="lead">Excel 파일을 업로드하면 HTML로 변환하여 미리보기를 보여줍니다. 서식과 이미지가 포함됩니다.</p>
-    
+    <h1>Excel to HTML</h1>
     <div class="drop-area" id="drop-area">
-        <p>Excel 파일을 여기에 끌어다 놓거나 클릭하여 선택하세요</p>
+        <p>Excel 파일을 여기에 드롭하세요</p>
         <input type="file" id="file-input" accept=".xlsx,.xls" style="display: none;">
-        <button class="btn btn-primary" onclick="document.getElementById('file-input').click()">파일 선택</button>
+        <button onclick="document.getElementById('file-input').click()">파일 선택</button>
     </div>
-    
-    <div class="loading" id="loading">
-        <div class="loader"></div>
-        <p>파일 처리 중...</p>
-    </div>
-    
-    <div class="preview-container" id="preview-container" style="display: none;">
-        <h2>변환 결과</h2>
-        <div class="sheet-tabs" id="sheet-tabs"></div>
-        <div class="sheet-contents" id="sheet-contents"></div>
-        <button class="btn btn-success" id="download-all-btn">모든 시트 HTML 다운로드</button>
-    </div>
+    <div id="preview" style="margin-top: 20px;"></div>
 
     <script src="https://cdn.jsdelivr.net/npm/exceljs@4.3.0/dist/exceljs.min.js"></script>
     <script>
-        let workbook = null;
-        let generatedHtml = {};
+        console.log(typeof ExcelJS === 'undefined' ? 'ExcelJS 로드 실패' : 'ExcelJS 로드 성공');
 
         const dropArea = document.getElementById('drop-area');
         const fileInput = document.getElementById('file-input');
-        const loading = document.getElementById('loading');
-        const previewContainer = document.getElementById('preview-container');
-        const sheetTabs = document.getElementById('sheet-tabs');
-        const sheetContents = document.getElementById('sheet-contents');
-        const downloadAllBtn = document.getElementById('download-all-btn');
+        const preview = document.getElementById('preview');
 
-        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-            dropArea.addEventListener(eventName, preventDefaults, false);
-        });
-
-        function preventDefaults(e) {
+        dropArea.addEventListener('drop', (e) => {
             e.preventDefault();
-            e.stopPropagation();
-        }
-
-        ['dragenter', 'dragover'].forEach(eventName => {
-            dropArea.addEventListener(eventName, highlight, false);
+            handleFiles(e.dataTransfer.files);
         });
+        dropArea.addEventListener('dragover', (e) => e.preventDefault());
+        fileInput.addEventListener('change', () => handleFiles(fileInput.files));
 
-        ['dragleave', 'drop'].forEach(eventName => {
-            dropArea.addEventListener(eventName, unhighlight, false);
-        });
-
-        function highlight() {
-            dropArea.classList.add('active');
-        }
-
-        function unhighlight() {
-            dropArea.classList.remove('active');
-        }
-
-        dropArea.addEventListener('drop', handleDrop, false);
-        function handleDrop(e) {
-            const dt = e.dataTransfer;
-            const files = dt.files;
-            handleFiles(files);
-        }
-
-        fileInput.addEventListener('change', function() {
-            handleFiles(this.files);
-        });
-
-        function handleFiles(files) {
-            if (files.length > 0) {
-                const file = files[0];
-                if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
-                    processExcelFile(file);
-                } else {
-                    alert('Excel 파일(.xlsx 또는 .xls)만 업로드 가능합니다.');
-                }
+        async function handleFiles(files) {
+            if (files.length === 0) return;
+            const file = files[0];
+            if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
+                alert('Excel 파일만 가능합니다.');
+                return;
             }
-        }
 
-        async function processExcelFile(file) {
             try {
-                loading.style.display = 'block';
-                dropArea.style.display = 'none';
-                previewContainer.style.display = 'none';
-                
-                workbook = new ExcelJS.Workbook();
+                const workbook = new ExcelJS.Workbook();
                 const arrayBuffer = await file.arrayBuffer();
                 await workbook.xlsx.load(arrayBuffer);
-                
-                sheetTabs.innerHTML = '';
-                sheetContents.innerHTML = '';
-                generatedHtml = {};
-                
-                let isFirst = true;
-                workbook.eachSheet((sheet, sheetId) => {
-                    const sheetName = sheet.name;
-                    const safeName = sheetName.replace(/[^a-zA-Z0-9]/g, '_');
-                    
-                    const tab = document.createElement('div');
-                    tab.className = `sheet-tab${isFirst ? ' active' : ''}`;
-                    tab.innerText = sheetName;
-                    tab.onclick = function() { showSheet(safeName); };
-                    sheetTabs.appendChild(tab);
-                    
-                    const content = document.createElement('div');
-                    content.className = `sheet-content${isFirst ? ' active' : ''}`;
-                    content.id = safeName;
-                    
-                    const sheetHtml = convertSheetToHtml(sheet);
-                    content.innerHTML = sheetHtml;
-                    sheetContents.appendChild(content);
-                    
-                    generatedHtml[safeName] = {
-                        name: sheetName,
-                        html: sheetHtml
-                    };
-                    
-                    isFirst = false;
-                });
-                
-                downloadAllBtn.style.display = 'block';
-                downloadAllBtn.onclick = downloadAllSheets;
-                
-                previewContainer.style.display = 'block';
-            } catch (error) {
-                console.error('Excel 처리 중 오류 발생:', error);
-                alert('파일 처리 중 오류가 발생했습니다: ' + error.message);
-            } finally {
-                loading.style.display = 'none';
-                dropArea.style.display = 'block';
-            }
-        }
 
-        function convertSheetToHtml(sheet) {
-            let html = '<table>';
-            
-            const columnWidths = {};
-            sheet.columns.forEach((column, index) => {
-                if (column.width) {
-                    columnWidths[index + 1] = column.width * 8;
-                }
-            });
-            
-            const mergedCells = {};
-            sheet.getMerges().forEach(merge => {
-                const range = decodeRef(merge);
-                for (let r = range.top; r <= range.bottom; r++) {
-                    for (let c = range.left; c <= range.right; c++) {
-                        mergedCells[`${r},${c}`] = {
-                            top: range.top,
-                            left: range.left,
-                            rowspan: range.bottom - range.top + 1,
-                            colspan: range.right - range.left + 1
-                        };
-                    }
-                }
-            });
-            
-            const images = [];
-            sheet.getImages().forEach(image => {
-                const img = workbook.model.media.find(m => m.index === image.imageId);
-                if (img) {
-                    const base64 = arrayBufferToBase64(img.buffer);
-                    const contentType = img.extension === 'png' ? 'image/png' : 'image/jpeg';
-                    const dataUrl = `data:${contentType};base64,${base64}`;
-                    images.push({
-                        row: image.range.tl.row + 1,
-                        col: image.range.tl.col + 1,
-                        dataUrl: dataUrl,
-                        width: image.width || 100,
-                        height: image.height || 100
+                let html = '';
+                workbook.eachSheet((sheet) => {
+                    html += `<h2>${sheet.name}</h2><table border="1">`;
+                    sheet.eachRow((row) => {
+                        html += '<tr>';
+                        row.eachCell((cell) => {
+                            html += `<td>${escapeHtml(cell.value || '')}</td>`;
+                        });
+                        html += '</tr>';
                     });
-                }
-            });
-            
-            sheet.eachRow({ includeEmpty: true }, (row, rowNum) => {
-                html += '<tr>';
-                row.eachCell({ includeEmpty: true }, (cell, colNum) => {
-                    const cellKey = `${rowNum},${colNum}`;
-                    if (mergedCells[cellKey]) {
-                        if (mergedCells[cellKey].top === rowNum && mergedCells[cellKey].left === colNum) {
-                            const style = getCellStyle(cell, columnWidths[colNum]);
-                            const value = getCellValue(cell);
-                            html += `<td rowspan="${mergedCells[cellKey].rowspan}" colspan="${mergedCells[cellKey].colspan}" style="${style}">${value}</td>`;
-                        }
-                    } else {
-                        const style = getCellStyle(cell, columnWidths[colNum]);
-                        const value = getCellValue(cell);
-                        html += `<td style="${style}">${value}</td>`;
-                    }
+                    html += '</table>';
                 });
-                html += '</tr>';
-            });
-            
-            html += '</table>';
-            
-            if (images.length > 0) {
-                html += '<div class="image-container" style="position: relative;">';
-                images.forEach(img => {
-                    const top = (img.row - 1) * 20;
-                    const left = (img.col - 1) * 100;
-                    html += `<img src="${img.dataUrl}" style="position: absolute; top: ${top}px; left: ${left}px; width: ${img.width}px; height: ${img.height}px;">`;
-                });
-                html += '</div>';
+                preview.innerHTML = html;
+            } catch (error) {
+                console.error('오류:', error);
+                alert('파일 처리 중 오류 발생: ' + error.message);
             }
-            
-            return html;
-        }
-
-        function getCellStyle(cell, columnWidth) {
-            const style = [];
-            if (cell.style) {
-                if (cell.style.fill && cell.style.fill.type === 'pattern' && cell.style.fill.pattern === 'solid') {
-                    const bgColor = cell.style.fill.fgColor?.argb ? `#${cell.style.fill.fgColor.argb.slice(2)}` : '';
-                    if (bgColor) style.push(`background-color: ${bgColor}`);
-                }
-                if (cell.style.font) {
-                    if (cell.style.font.color?.argb) style.push(`color: #${cell.style.font.color.argb.slice(2)}`);
-                    if (cell.style.font.size) style.push(`font-size: ${cell.style.font.size}pt`);
-                    if (cell.style.font.bold) style.push('font-weight: bold');
-                    if (cell.style.font.italic) style.push('font-style: italic');
-                    if (cell.style.font.underline) style.push('text-decoration: underline');
-                }
-                if (cell.style.alignment) {
-                    if (cell.style.alignment.horizontal) style.push(`text-align: ${cell.style.alignment.horizontal}`);
-                    if (cell.style.alignment.vertical) style.push(`vertical-align: ${cell.style.alignment.vertical}`);
-                    if (cell.style.alignment.wrapText) style.push('white-space: pre-wrap');
-                }
-                ['top', 'right', 'bottom', 'left'].forEach(side => {
-                    const border = cell.style.border?.[side];
-                    if (border?.style) {
-                        const borderColor = border.color?.argb ? `#${border.color.argb.slice(2)}` : '#000000';
-                        style.push(`border-${side}: 1px ${border.style} ${borderColor}`);
-                    }
-                });
-            }
-            if (columnWidth) style.push(`width: ${columnWidth}px`);
-            style.push('padding: 4px');
-            return style.join('; ');
-        }
-
-        function getCellValue(cell) {
-            if (!cell || cell.value === null || cell.value === undefined) return ' ';
-            if (cell.formula) return cell.result || '';
-            if (cell.hyperlink) return `<a href="${cell.hyperlink}" target="_blank">${escapeHtml(cell.text || cell.value)}</a>`;
-            if (cell.value instanceof Date) return cell.value.toLocaleDateString();
-            if (cell.value?.richText) {
-                return cell.value.richText.map(part => escapeHtml(part.text)).join('');
-            }
-            if (typeof cell.value === 'string') return escapeHtml(cell.value).replace(/\n/g, '<br>');
-            return escapeHtml(String(cell.value));
-        }
-
-        function arrayBufferToBase64(buffer) {
-            const bytes = new Uint8Array(buffer);
-            let binary = '';
-            for (let i = 0; i < bytes.byteLength; i++) {
-                binary += String.fromCharCode(bytes[i]);
-            }
-            return window.btoa(binary);
-        }
-
-        function decodeRef(ref) {
-            const rangeMatch = ref.match(/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/);
-            if (rangeMatch) {
-                const col1 = columnNameToNumber(rangeMatch[1]);
-                const row1 = parseInt(rangeMatch[2]);
-                const col2 = columnNameToNumber(rangeMatch[3]);
-                const row2 = parseInt(rangeMatch[4]);
-                return {
-                    top: Math.min(row1, row2),
-                    left: Math.min(col1, col2),
-                    bottom: Math.max(row1, row2),
-                    right: Math.max(col1, col2)
-                };
-            }
-            const singleCellMatch = ref.match(/^([A-Z]+)(\d+)$/);
-            if (singleCellMatch) {
-                const col = columnNameToNumber(singleCellMatch[1]);
-                const row = parseInt(singleCellMatch[2]);
-                return { top: row, left: col, bottom: row, right: col };
-            }
-            return null;
-        }
-
-        function columnNameToNumber(name) {
-            let num = 0;
-            for (let i = 0; i < name.length; i++) {
-                num = num * 26 + (name.charCodeAt(i) - 64);
-            }
-            return num;
-        }
-
-        function showSheet(sheetName) {
-            document.querySelectorAll('.sheet-tab').forEach(tab => tab.classList.remove('active'));
-            document.querySelectorAll('.sheet-content').forEach(content => content.classList.remove('active'));
-            document.querySelector(`.sheet-tab:nth-child(${Array.from(sheetTabs.children).findIndex(tab => tab.innerText === generatedHtml[sheetName].name) + 1})`).classList.add('active');
-            document.getElementById(sheetName).classList.add('active');
-        }
-
-        function downloadAllSheets() {
-            const htmlTemplate = `<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>Excel 변환 결과</title>
-    <style>
-        body { font-family: 'Malgun Gothic', '맑은 고딕', sans-serif; margin: 0; padding: 20px; }
-        .container { width: 95%; max-width: 1200px; margin: 0 auto; }
-        .tab { overflow: hidden; border: 1px solid #ccc; background-color: #f1f1f1; border-radius: 4px 4px 0 0; }
-        .tab button { background-color: inherit; float: left; border: none; outline: none; cursor: pointer; padding: 14px 16px; transition: 0.3s; font-size: 16px; border-right: 1px solid #ddd; }
-        .tab button:hover { background-color: #ddd; }
-        .tab button.active { background-color: #4285f4; color: white; }
-        .tabcontent { display: none; padding: 20px; border: 1px solid #ccc; border-top: none; border-radius: 0 0 4px 4px; }
-        .tabcontent.active { display: block; }
-        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-        table, th, td { border: 1px solid #ddd; }
-        th, td { padding: 8px; text-align: left; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>Excel 변환 결과</h1>
-        <div class="tab" id="sheetTabs">
-            ${Object.values(generatedHtml).map((sheet, index) => 
-                `<button class="tablinks ${index === 0 ? 'active' : ''}" onclick="openSheet(event, '${sheet.name.replace(/[^a-zA-Z0-9]/g, '_')}')">${sheet.name}</button>`
-            ).join('')}
-        </div>
-        ${Object.values(generatedHtml).map((sheet, index) => 
-            `<div id="${sheet.name.replace(/[^a-zA-Z0-9]/g, '_')}" class="tabcontent ${index === 0 ? 'active' : ''}">
-                <h2>${sheet.name}</h2>
-                ${sheet.html}
-            </div>`
-        ).join('')}
-    </div>
-    <script>
-    function openSheet(evt, sheetName) {
-        var tabcontent = document.getElementsByClassName("tabcontent");
-        for (var i = 0; i < tabcontent.length; i++) {
-            tabcontent[i].style.display = "none";
-            tabcontent[i].classList.remove("active");
-        }
-        var tablinks = document.getElementsByClassName("tablinks");
-        for (var i = 0; i < tablinks.length; i++) {
-            tablinks[i].className = tablinks[i].className.replace(" active", "");
-        }
-        document.getElementById(sheetName).style.display = "block";
-        document.getElementById(sheetName).classList.add("active");
-        evt.currentTarget.className += " active";
-    }
-    </script>
-</body>
-</html>`;
-            
-            const blob = new Blob([htmlTemplate], { type: 'text/html' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'excel-to-html.html';
-            document.body.appendChild(a);
-            a.click();
-            setTimeout(() => {
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-            }, 0);
         }
 
         function escapeHtml(text) {
             if (typeof text !== 'string') return String(text);
             return text
-           .replace(/&/g, '&amp;')
-           .replace(/</g, '&lt;')
-           .replace(/>/g, '&gt;')
-           .replace(/"/g, '&quot;')
-           .replace(/'/g, '&#39;');
+                .replace(/&/g, '&')
+                .replace(/</g, '<')
+                .replace(/>/g, '>')
+                .replace(/"/g, '"')
+                .replace(/'/g, ''');
         }
     </script>
 </body>
